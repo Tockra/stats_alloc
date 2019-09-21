@@ -199,9 +199,6 @@ impl ops::SubAssign for Stats {
         self.bytes_allocated -= rhs.bytes_allocated;
         self.bytes_deallocated -= rhs.bytes_deallocated;
         self.bytes_reallocated -= rhs.bytes_reallocated;
-
-        self.bytes_current_used -= rhs.bytes_current_used;
-        self.bytes_max_used = self.bytes_current_used.max(self.bytes_max_used);
     }
 }
 
@@ -288,9 +285,7 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for StatsAlloc<T> {
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         self.deallocations.fetch_add(1, Ordering::SeqCst);
         self.bytes_deallocated.fetch_add(layout.size(), Ordering::SeqCst);
-
         self.bytes_current_used.fetch_sub(layout.size(), Ordering::SeqCst);
-        self.bytes_max_used.fetch_max(self.bytes_current_used.load(Ordering::SeqCst), Ordering::SeqCst);
 
         self.inner.dealloc(ptr, layout)
     }
@@ -310,8 +305,8 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for StatsAlloc<T> {
         if new_size > layout.size() {
             let difference = new_size - layout.size();
             self.bytes_allocated.fetch_add(difference, Ordering::SeqCst);
-
             self.bytes_current_used.fetch_add(difference, Ordering::SeqCst);
+            self.bytes_max_used.fetch_max(self.bytes_current_used.load(Ordering::SeqCst), Ordering::SeqCst);
         } else if new_size < layout.size() {
             let difference = layout.size() - new_size;
             self.bytes_deallocated.fetch_add(difference, Ordering::SeqCst);
@@ -321,7 +316,7 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for StatsAlloc<T> {
         self.bytes_reallocated
             .fetch_add(new_size.wrapping_sub(layout.size()) as isize, Ordering::SeqCst);
 
-        self.bytes_max_used.fetch_max(self.bytes_current_used.load(Ordering::SeqCst), Ordering::SeqCst);
+        
 
         self.inner.realloc(ptr, layout, new_size)
     }
