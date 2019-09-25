@@ -217,11 +217,7 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
     pub fn new(alloc: &'a StatsAlloc<T>) -> Self {
         Region {
             alloc,
-<<<<<<< Updated upstream
             initial_stats: alloc.stats(),
-=======
-            initial_stats: alloc.stats();,
->>>>>>> Stashed changes
         }
     }
 
@@ -247,7 +243,7 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
         let diff = latest - self.initial_stats;
         self.initial_stats = latest;
         self.initial_stats.bytes_max_used = 0;
-        self.alloc.bytes_max_used = AtomicUsize::new(0);
+        self.alloc.bytes_max_used.store(0,Ordering::SeqCst);
         diff
     }
 
@@ -257,7 +253,7 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
     pub fn reset(&mut self) {
         self.initial_stats = self.alloc.stats();
         self.initial_stats.bytes_max_used = 0;
-        self.alloc.bytes_max_used = AtomicUsize::new(0);
+        self.alloc.bytes_max_used.store(0,Ordering::SeqCst);
     }
 }
 
