@@ -217,7 +217,11 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
     pub fn new(alloc: &'a StatsAlloc<T>) -> Self {
         Region {
             alloc,
+<<<<<<< Updated upstream
             initial_stats: alloc.stats(),
+=======
+            initial_stats: alloc.stats();,
+>>>>>>> Stashed changes
         }
     }
 
