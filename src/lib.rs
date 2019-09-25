@@ -206,7 +206,7 @@ impl ops::SubAssign for Stats {
 /// allocation changes while the `Region` is alive.
 #[derive(Debug)]
 pub struct Region<'a, T: GlobalAlloc + 'a> {
-    alloc: &'a StatsAlloc<T>,
+    alloc: &'a mut StatsAlloc<T>,
     initial_stats: Stats,
 }
 
@@ -214,10 +214,11 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
     /// Creates a new region using statistics from the given instrumented
     /// allocator.
     #[inline]
-    pub fn new(alloc: &'a StatsAlloc<T>) -> Self {
+    pub fn new(alloc: &'a mut StatsAlloc<T>) -> Self {
+        let init = alloc.stats();
         Region {
             alloc,
-            initial_stats: alloc.stats(),
+            initial_stats: init,
         }
     }
 
