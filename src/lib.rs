@@ -242,6 +242,8 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
         let latest = self.alloc.stats();
         let diff = latest - self.initial_stats;
         self.initial_stats = latest;
+        self.initial_stats.bytes_max_used = 0;
+        self.alloc.bytes_max_used = AtomicUsize::new(0);
         diff
     }
 
@@ -250,6 +252,8 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
     #[inline]
     pub fn reset(&mut self) {
         self.initial_stats = self.alloc.stats();
+        self.initial_stats.bytes_max_used = 0;
+        self.alloc.bytes_max_used = AtomicUsize::new(0);
     }
 }
 
