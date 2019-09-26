@@ -244,6 +244,7 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
         self.initial_stats = latest;
         self.initial_stats.bytes_max_used = 0;
         self.alloc.bytes_max_used.store(0,Ordering::SeqCst);
+        self.alloc.bytes_current_used.store(0,Ordering::SeqCst);
         diff
     }
 
@@ -254,6 +255,7 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
         self.initial_stats = self.alloc.stats();
         self.initial_stats.bytes_max_used = 0;
         self.alloc.bytes_max_used.store(0,Ordering::SeqCst);
+        self.alloc.bytes_current_used.store(0,Ordering::SeqCst);
     }
 }
 
