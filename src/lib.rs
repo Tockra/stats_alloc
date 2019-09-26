@@ -200,7 +200,6 @@ impl ops::SubAssign for Stats {
         self.bytes_deallocated -= rhs.bytes_deallocated;
         self.bytes_reallocated -= rhs.bytes_reallocated;
         
-        self.bytes_current_used = rhs.bytes_current_used; 
     }
 }
 
