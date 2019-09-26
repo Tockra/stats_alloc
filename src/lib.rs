@@ -232,7 +232,9 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
     /// those provided by `initial()`.
     #[inline]
     pub fn change(&self) -> Stats {
-        self.alloc.stats() - self.initial_stats
+        let mut diff = self.alloc.stats() - self.initial_stats;
+        diff.bytes_current_used = (diff.bytes_allocated as isize + diff.bytes_reallocated - diff.bytes_deallocated as isize) as usize;
+        diff
     }
 
     /// Returns the difference between the currently reported statistics and
@@ -241,10 +243,11 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
     #[inline]
     pub fn change_and_reset(&mut self) -> Stats {
         let latest = self.alloc.stats();
-        let diff = latest - self.initial_stats;
+        let mut diff = latest - self.initial_stats;
         self.initial_stats = latest;
         self.initial_stats.bytes_max_used = 0;
         self.alloc.bytes_max_used.store(0,Ordering::SeqCst);
+        diff.bytes_current_used = (diff.bytes_allocated as isize + diff.bytes_reallocated - diff.bytes_deallocated as isize) as usize;
         diff
     }
 
