@@ -199,6 +199,8 @@ impl ops::SubAssign for Stats {
         self.bytes_allocated -= rhs.bytes_allocated;
         self.bytes_deallocated -= rhs.bytes_deallocated;
         self.bytes_reallocated -= rhs.bytes_reallocated;
+        
+        self.bytes_current_used = rhs.bytes_current_used; 
     }
 }
 
@@ -244,7 +246,6 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
         self.initial_stats = latest;
         self.initial_stats.bytes_max_used = 0;
         self.alloc.bytes_max_used.store(0,Ordering::SeqCst);
-        self.alloc.bytes_current_used.store(0,Ordering::SeqCst);
         diff
     }
 
@@ -255,7 +256,6 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
         self.initial_stats = self.alloc.stats();
         self.initial_stats.bytes_max_used = 0;
         self.alloc.bytes_max_used.store(0,Ordering::SeqCst);
-        self.alloc.bytes_current_used.store(0,Ordering::SeqCst);
     }
 }
 
