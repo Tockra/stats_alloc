@@ -227,7 +227,7 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
     #[inline]
     pub fn change(&self) -> Stats {
         let mut diff = self.alloc.stats() - self.initial_stats;
-        diff.bytes_current_used = (diff.bytes_allocated as isize + diff.bytes_reallocated - diff.bytes_deallocated as isize) as usize;
+        diff.bytes_current_used = diff.bytes_allocated  - diff.bytes_deallocated;
         diff.bytes_max_used = diff.bytes_max_used.max(diff.bytes_current_used);
         diff
     }
@@ -242,7 +242,7 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
         self.initial_stats = latest;
         self.initial_stats.bytes_max_used = 0;
         self.alloc.bytes_max_used.store(0,Ordering::SeqCst);
-        diff.bytes_current_used = (diff.bytes_allocated as isize + diff.bytes_reallocated - diff.bytes_deallocated as isize) as usize;
+        diff.bytes_current_used = diff.bytes_allocated - diff.bytes_deallocated;
         diff
     }
 
