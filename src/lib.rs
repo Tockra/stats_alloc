@@ -36,7 +36,6 @@
 )]
 #![cfg_attr(feature = "nightly", feature(const_fn))]
 #![cfg_attr(feature = "docs-rs", feature(allocator_api))]
-#![feature(atomic_min_max)]
 
 use std::{
     alloc::{GlobalAlloc, Layout, System},
@@ -54,7 +53,6 @@ pub struct StatsAlloc<T: GlobalAlloc> {
     bytes_allocated: AtomicUsize,
     bytes_deallocated: AtomicUsize,
     bytes_reallocated: AtomicIsize,
-    bytes_current_used: AtomicUsize,
     bytes_max_used: AtomicUsize,
     inner: T,
 }
@@ -110,7 +108,6 @@ pub static INSTRUMENTED_SYSTEM: StatsAlloc<System> = StatsAlloc {
     bytes_allocated: AtomicUsize::new(0),
     bytes_deallocated: AtomicUsize::new(0),
     bytes_reallocated: AtomicIsize::new(0),
-    bytes_current_used: AtomicUsize::new(0),
     bytes_max_used: AtomicUsize::new(0),
     inner: System,
 };
@@ -125,7 +122,6 @@ impl StatsAlloc<System> {
             bytes_allocated: AtomicUsize::new(0),
             bytes_deallocated: AtomicUsize::new(0),
             bytes_reallocated: AtomicIsize::new(0),
-            bytes_current_used: AtomicUsize::new(0),
             bytes_max_used: AtomicUsize::new(0),
             inner: System,
         }
@@ -144,7 +140,6 @@ impl<T: GlobalAlloc> StatsAlloc<T> {
             bytes_allocated: AtomicUsize::new(0),
             bytes_deallocated: AtomicUsize::new(0),
             bytes_reallocated: AtomicIsize::new(0),
-            bytes_current_used: AtomicUsize::new(0),
             bytes_max_used: AtomicUsize::new(0),
             inner,
         }
@@ -161,7 +156,6 @@ impl<T: GlobalAlloc> StatsAlloc<T> {
             bytes_allocated: AtomicUsize::new(0),
             bytes_deallocated: AtomicUsize::new(0),
             bytes_reallocated: AtomicIsize::new(0),
-            bytes_current_used: AtomicUsize::new(0),
             bytes_max_used: AtomicUsize::new(0),
             inner,
         }
@@ -176,7 +170,7 @@ impl<T: GlobalAlloc> StatsAlloc<T> {
             bytes_allocated: self.bytes_allocated.load(Ordering::SeqCst),
             bytes_deallocated: self.bytes_deallocated.load(Ordering::SeqCst),
             bytes_reallocated: self.bytes_reallocated.load(Ordering::SeqCst),
-            bytes_current_used: self.bytes_current_used.load(Ordering::SeqCst),
+            bytes_current_used: 0,
             bytes_max_used: self.bytes_max_used.load(Ordering::SeqCst),
         }
     }
@@ -234,6 +228,7 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
     pub fn change(&self) -> Stats {
         let mut diff = self.alloc.stats() - self.initial_stats;
         diff.bytes_current_used = (diff.bytes_allocated as isize + diff.bytes_reallocated - diff.bytes_deallocated as isize) as usize;
+        diff.bytes_max_used = diff.bytes_max_used.max(diff.bytes_current_used);
         diff
     }
 
@@ -248,7 +243,6 @@ impl<'a, T: GlobalAlloc + 'a> Region<'a, T> {
         self.initial_stats.bytes_max_used = 0;
         self.alloc.bytes_max_used.store(0,Ordering::SeqCst);
         diff.bytes_current_used = (diff.bytes_allocated as isize + diff.bytes_reallocated - diff.bytes_deallocated as isize) as usize;
-        diff.bytes_max_used = diff.bytes_max_used.max(diff.bytes_current_used);
         diff
     }
 
@@ -285,8 +279,12 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for StatsAlloc<T> {
         self.allocations.fetch_add(1, Ordering::SeqCst);
         self.bytes_allocated.fetch_add(layout.size(), Ordering::SeqCst);
 
-        self.bytes_current_used.fetch_add(layout.size(), Ordering::SeqCst);
-        self.bytes_max_used.fetch_max(self.bytes_current_used.load(Ordering::SeqCst), Ordering::SeqCst);
+        let alloc = self.bytes_allocated.load(Ordering::SeqCst);
+        let dealloc = self.bytes_deallocated.load(Ordering::SeqCst);
+        let realloc = self.bytes_reallocated.load(Ordering::SeqCst);
+        let bytes_current_used = (alloc as isize + realloc - dealloc as isize) as usize;
+        let curr_max = self.bytes_max_used.load(Ordering::SeqCst);
+        self.bytes_max_used.store(curr_max.max(bytes_current_used), Ordering::SeqCst);
 
         self.inner.alloc(layout)
     }
@@ -294,7 +292,6 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for StatsAlloc<T> {
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         self.deallocations.fetch_add(1, Ordering::SeqCst);
         self.bytes_deallocated.fetch_add(layout.size(), Ordering::SeqCst);
-        self.bytes_current_used.fetch_sub(layout.size(), Ordering::SeqCst);
 
         self.inner.dealloc(ptr, layout)
     }
@@ -303,8 +300,12 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for StatsAlloc<T> {
         self.allocations.fetch_add(1, Ordering::SeqCst);
         self.bytes_allocated.fetch_add(layout.size(), Ordering::SeqCst);
 
-        self.bytes_current_used.fetch_add(layout.size(), Ordering::SeqCst);
-        self.bytes_max_used.fetch_max(self.bytes_current_used.load(Ordering::SeqCst), Ordering::SeqCst);
+        let alloc = self.bytes_allocated.load(Ordering::SeqCst);
+        let dealloc = self.bytes_deallocated.load(Ordering::SeqCst);
+        let realloc = self.bytes_reallocated.load(Ordering::SeqCst);
+        let bytes_current_used = (alloc as isize + realloc - dealloc as isize) as usize;
+        let curr_max = self.bytes_max_used.load(Ordering::SeqCst);
+        self.bytes_max_used.store(curr_max.max(bytes_current_used), Ordering::SeqCst);
 
         self.inner.alloc_zeroed(layout)
     }
@@ -314,13 +315,17 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for StatsAlloc<T> {
         if new_size > layout.size() {
             let difference = new_size - layout.size();
             self.bytes_allocated.fetch_add(difference, Ordering::SeqCst);
-            self.bytes_current_used.fetch_add(difference, Ordering::SeqCst);
-            self.bytes_max_used.fetch_max(self.bytes_current_used.load(Ordering::SeqCst), Ordering::SeqCst);
+            
+            let alloc = self.bytes_allocated.load(Ordering::SeqCst);
+            let dealloc = self.bytes_deallocated.load(Ordering::SeqCst);
+            let realloc = self.bytes_reallocated.load(Ordering::SeqCst);
+            let bytes_current_used = (alloc as isize + realloc - dealloc as isize) as usize;
+            let curr_max = self.bytes_max_used.load(Ordering::SeqCst);
+            self.bytes_max_used.store(curr_max.max(bytes_current_used), Ordering::SeqCst);
+
         } else if new_size < layout.size() {
             let difference = layout.size() - new_size;
             self.bytes_deallocated.fetch_add(difference, Ordering::SeqCst);
-
-            self.bytes_current_used.fetch_sub(difference, Ordering::SeqCst);
         }
         self.bytes_reallocated
             .fetch_add(new_size.wrapping_sub(layout.size()) as isize, Ordering::SeqCst);
