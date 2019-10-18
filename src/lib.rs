@@ -282,7 +282,7 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for StatsAlloc<T> {
         let alloc = self.bytes_allocated.load(Ordering::SeqCst);
         let dealloc = self.bytes_deallocated.load(Ordering::SeqCst);
         let realloc = self.bytes_reallocated.load(Ordering::SeqCst);
-        let bytes_current_used = (alloc as isize + realloc - dealloc as isize) as usize;
+        let bytes_current_used = (alloc as isize - dealloc as isize) as usize;
         let curr_max = self.bytes_max_used.load(Ordering::SeqCst);
         self.bytes_max_used.store(curr_max.max(bytes_current_used), Ordering::SeqCst);
 
@@ -302,8 +302,7 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for StatsAlloc<T> {
 
         let alloc = self.bytes_allocated.load(Ordering::SeqCst);
         let dealloc = self.bytes_deallocated.load(Ordering::SeqCst);
-        let realloc = self.bytes_reallocated.load(Ordering::SeqCst);
-        let bytes_current_used = (alloc as isize + realloc - dealloc as isize) as usize;
+        let bytes_current_used = (alloc as isize - dealloc as isize) as usize;
         let curr_max = self.bytes_max_used.load(Ordering::SeqCst);
         self.bytes_max_used.store(curr_max.max(bytes_current_used), Ordering::SeqCst);
 
@@ -318,8 +317,7 @@ unsafe impl<T: GlobalAlloc> GlobalAlloc for StatsAlloc<T> {
             
             let alloc = self.bytes_allocated.load(Ordering::SeqCst);
             let dealloc = self.bytes_deallocated.load(Ordering::SeqCst);
-            let realloc = self.bytes_reallocated.load(Ordering::SeqCst);
-            let bytes_current_used = (alloc as isize + realloc - dealloc as isize) as usize;
+            let bytes_current_used = (alloc as isize - dealloc as isize) as usize;
             let curr_max = self.bytes_max_used.load(Ordering::SeqCst);
             self.bytes_max_used.store(curr_max.max(bytes_current_used), Ordering::SeqCst);
 
